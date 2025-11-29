@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package approval;
+
+message Step {
+  int32 step       = 1;
+  int64 approverId = 2;
+  string status    = 3;
+}
+
+message ApprovalRequest {
+  int64 requestId   = 1;
+  int64 requesterId = 2;
+  string title      = 3;
+  string content    = 4;
+  repeated Step steps = 5;
+}
+
+message ApprovalResponse {
+  int64 requestId = 1;
+  string message  = 2;
+}
+
+service Approval {
+  // Approval Request Service -> Approval Processing Service
+  rpc RequestApproval(ApprovalRequest) returns (ApprovalResponse);
+}

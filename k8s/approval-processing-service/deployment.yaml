@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: approval-processing-service
+  namespace: erp
+  labels:
+    app: approval-processing-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: approval-processing-service
+  template:
+    metadata:
+      labels:
+        app: approval-processing-service
+    spec:
+      containers:
+        - name: approval-processing-service
+          image: infra-approval-processing-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000  # REST
+            - containerPort: 50051 # gRPC (현재는 쓰레드에서 띄우는 버전)
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: APPROVAL_REQUEST_BASE_URL
+              value: http://approval-request-service:8000
+            - name: RABBITMQ_URL
+              value: amqp://erpuser:erppassword@rabbitmq:5672/

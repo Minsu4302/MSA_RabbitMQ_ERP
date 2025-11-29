@@ -1,0 +1,112 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: erp
+      MYSQL_USER: erpuser
+      MYSQL_PASSWORD: erppassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../scripts/init_mysql.sql:/docker-entrypoint-initdb.d/init_mysql.sql:ro
+
+  employee-service:
+    build:
+      context: ../backend/employee-service
+      dockerfile: Dockerfile
+    container_name: employee-service
+    depends_on:
+      - mysql
+    ports:
+      - "8001:8000"
+    volumes:
+      - ../backend/employee-service/app:/app/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=erpuser
+      - MYSQL_PASSWORD=erppassword
+      - MYSQL_DB=erp
+
+  mongodb:
+    image: mongo:6
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: erpuser
+      RABBITMQ_DEFAULT_PASS: erppassword
+
+  approval-request-service:
+    build:
+      context: ../backend/approval-request-service
+      dockerfile: Dockerfile
+    container_name: approval-request-service
+    depends_on:
+      - mongodb
+      - employee-service
+      - rabbitmq
+    ports:
+      - "8002:8000"
+    volumes:
+      - ../backend/approval-request-service/app:/app/app
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_DB_NAME=erp
+      - MONGODB_COLLECTION_NAME=approvals
+      - EMPLOYEE_SERVICE_BASE_URL=http://employee-service:8000
+      - NOTIFICATION_SERVICE_BASE_URL=http://notification-service:8000
+      - RABBITMQ_URL=amqp://erpuser:erppassword@rabbitmq:5672/
+      - PYTHONUNBUFFERED=1
+
+  approval-processing-service:
+    build:
+      context: ../backend/approval-processing-service
+      dockerfile: Dockerfile
+    container_name: approval-processing-service
+    depends_on:
+      - employee-service
+      - rabbitmq
+      - approval-request-service
+    ports:
+      - "8003:8000"    # REST
+    volumes:
+      - ../backend/approval-processing-service/app:/app/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - APPROVAL_REQUEST_BASE_URL=http://approval-request-service:8000
+      - RABBITMQ_URL=amqp://erpuser:erppassword@rabbitmq:5672/
+
+  notification-service:
+    build:
+      context: ../backend/notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "8004:8000"
+    volumes:
+      - ../backend/notification-service/app:/app/app
+    environment:
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  mysql_data:
+  mongodb_data:

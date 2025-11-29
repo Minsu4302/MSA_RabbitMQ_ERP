@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+
+motor
+httpx
+grpcio
+protobuf
+aio-pika>=9.3.0,<10
