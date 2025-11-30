@@ -11,8 +11,6 @@ app = FastAPI(
     description="Employee CRUD service (REST + MySQL + SQLAlchemy)",
 )
 
-app.include_router(employees_router)
-
 @app.on_event("startup")
 async def on_startup() -> None:
     # MySQL에 employees 테이블 등 생성
@@ -33,8 +31,7 @@ async def root():
         "docs": "/docs",
     }
 
-
-# employees 라우터 등록
+app.include_router(employees_router)
 app.include_router(employees_router)
 app.include_router(attendance_router)
 app.include_router(leaves_router)

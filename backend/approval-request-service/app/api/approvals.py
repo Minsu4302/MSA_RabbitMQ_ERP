@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, date
 from typing import List
+from pymongo import ReturnDocument
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -79,13 +80,17 @@ async def _validate_employees(payload: ApprovalCreate) -> None:
 async def _get_next_request_id(
     collection: AsyncIOMotorCollection,
 ) -> int:
+    """Atomic하게 requestId 증가.
+    counters 컬렉션에 {_id: 'approval_request_id', seq: N} 형태로 저장 후 $inc.
+    동시성 레이스 조건 제거.
     """
-    MongoDB에서 가장 큰 requestId를 찾아 +1 (동시성까지 완벽하진 않지만 과제 수준에선 허용).
-    """
-    doc = await collection.find_one(sort=[("requestId", -1)])
-    if doc and "requestId" in doc:
-        return int(doc["requestId"]) + 1
-    return 1
+    counter = await collection.database["counters"].find_one_and_update(
+        {"_id": "approval_request_id"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    return int(counter["seq"])
 
 
 def _serialize_document(raw: dict) -> ApprovalDocument:
